@@ -129,6 +129,10 @@ class Submitter(SubmissionWidgetMixin, widgets.VBox):
             if option not in values or option in self.fixed_options
         ]
 
+    def update_options(self, feature_str):
+
+        self.options = feature_str.split(' ')
+
     def on_submit(self, callback: Callable[[Any], None]):
         """
         Add a function to call when the user submits a value.

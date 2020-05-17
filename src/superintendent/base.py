@@ -268,6 +268,9 @@ class Labeller(widgets.VBox):
             if self.display_preprocess is not None:
                 feature = self.display_preprocess(feature)
 
+            if hasattr(self.input_widget,'update_options'):
+                self.input_widget.update_options(feature)
+
             with self.display_timer:
                 with self.feature_output:
                     IPython.display.clear_output(wait=True)
@@ -296,8 +299,11 @@ class Labeller(widgets.VBox):
 
         self.progressbar.bar_style = "success"
 
+        if hasattr(self.queue, 'write_results'):
+            self.queue.write_results()
+
         finish_celebration = widgets.Box(
-            (widgets.HTML(value="<h1>Finished labelling 🎉!"),),
+            (widgets.HTML(value="<h1>Finished labelling!</h1>"),),
             layout=widgets.Layout(
                 justify_content="center",
                 padding="2.5% 0",
@@ -311,6 +317,11 @@ class Labeller(widgets.VBox):
     def new_labels(self):
         _, _, labels = self.queue.list_all()
         return labels
+
+    @property
+    def all_new_labels(self):
+        ids, x, y =  self.queue.list_all()
+        return ids, x, y
 
     def retrain(self, button=None):
         """Re-train the classifier you passed when creating this widget.
