@@ -21,7 +21,7 @@ from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
 class SimpleDatabaseQueue(BaseLabellingQueue):
     item = namedtuple("QueueItem", ["id", "data", "label"])
 
-    def __init__(self, db_string=None):
+    def __init__(self, db_string=None, message_type=None):
 
         self.data: Dict[int, Any] = dict()
         self.labels: Dict[int, Any] = dict()
@@ -39,7 +39,8 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
         self.features_db = Table('features', self.meta, autoload=True)
         self.labels_db = Table('labels', self.meta, autoload=True)
 
-        query = self.features_db.select()  # to do - a way to select a subset of results
+        query = self.features_db.select(
+            self.features_db.c.type == message_type)  # to do - a way to select a sample of results
         res = query.execute()
 
         for row in res:
