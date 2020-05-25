@@ -30,6 +30,7 @@ class TextLabeller(Labeller):
         model_preprocess=None,
         display_preprocess=None,
         message_type=None,
+        db_string=None,
     ):
         """
         A class for labelling your data.
@@ -98,7 +99,7 @@ class TextLabeller(Labeller):
             max_buttons=12,
         )
 
-        queue = SimpleDatabaseQueue(message_type=message_type)
+        queue = SimpleDatabaseQueue(db_string=db_string, message_type=message_type)
 
         super().__init__(
             features=features,
