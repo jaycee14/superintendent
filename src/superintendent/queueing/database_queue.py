@@ -2,20 +2,40 @@ import operator
 from collections import deque, namedtuple
 from functools import reduce
 from typing import Any, Deque, Dict, Optional, Set, Tuple
+from datetime import datetime
 
 from .base import BaseLabellingQueue
 from .utils import _features_to_array
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, DateTime
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
 
 
-# features = Table('features', meta,
-#                  Column('id', Integer, primary_key=True),
-#                  Column('feature_text', String), )
-#
-# labels = Table('labels', meta,
-#                Column('id', Integer, primary_key=True),
-#                Column('feature_id', Integer),
-#                Column('label_text', String), )
+class Features(Base):
+    __tablename__ = 'features'
+
+    id = Column(Integer, primary_key=True)
+    feature_text = Column(String)
+    type = Column(String)
+
+
+class Labels(Base):
+    __tablename__ = 'labels'
+
+    id = Column(Integer, primary_key=True)
+    feature_id = Column(Integer)
+    label_text = Column(String)
+    entry_id = Column(Integer)
+
+
+class Entries(Base):
+    __tablename__ = 'entries'
+
+    id = Column(Integer, primary_key=True)
+    entry_date = Column(DateTime, default=datetime.utcnow)
 
 
 class SimpleDatabaseQueue(BaseLabellingQueue):
@@ -33,29 +53,42 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
             db_string = 'sqlite:///test.db'
 
         self.engine = create_engine(db_string)
-        # self.conn = self.engine.connect()
-        self.meta = MetaData(self.engine)
+        Base.metadata.create_all(self.engine)
+        Session = sessionmaker(bind=self.engine)
+        self.session = Session()
 
-        self.features_db = Table('features', self.meta, autoload=True)
-        self.labels_db = Table('labels', self.meta, autoload=True)
+        new_entry = Entries()
+        self.session.add(new_entry)
+        self.session.commit()
 
-        query = self.features_db.select(
-            self.features_db.c.type == message_type)  # to do - a way to select a sample of results
-        res = query.execute()
+        self.entry_num = new_entry.id
 
-        for row in res:
-            self.data[row.id] = row.feature_text
-            self.order.appendleft(row.id)
+        subquery = self.session.query(Labels.feature_id,
+                                      func.count(Labels.label_text).label('ct')) \
+            .group_by(Labels.feature_id) \
+            .subquery()
+
+        query_all = self.session.query(Features, subquery) \
+            .outerjoin(subquery, Features.id == subquery.c.feature_id) \
+            .filter(Features.type == message_type) \
+            .order_by(subquery.c.ct.desc()) \
+            .limit(10)  # number of tweets to review
+
+        for instance in query_all:
+            row_id = instance.Features.id
+            self.data[row_id] = instance.Features.feature_text
+            self.order.appendleft(row_id)
 
     def write_results(self):
 
         insert_values = []
         for feature_id, label_text in self.labels.items():
             if label_text is not None:
-                insert_values.append({'feature_id': feature_id, 'label_text': ';'.join(label_text)})
+                insert_values.append(Labels(feature_id=feature_id, label_text=label_text, entry_id=self.entry_num))
 
-        insert = self.labels_db.insert()
-        insert.execute(insert_values)
+        self.session.add_all(insert_values)
+        self.session.commit()
+
 
     def enqueue(self, feature: Any, label: Optional[Any] = None):
         """Add a data point to the queue.
@@ -255,3 +288,6 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
             return self.pop()
         except IndexError:
             raise StopIteration
+
+    def __del__(self):
+        self.engine.close()
