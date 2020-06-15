@@ -73,7 +73,8 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
             .outerjoin(subquery, Features.id == subquery.c.feature_id) \
             .filter(Features.type == message_type) \
             .order_by(subquery.c.ct.desc()) \
-            .limit(400)
+            .limit(400)\
+            .subquery()
 
         # of those we sample ten - so mostly looking at the messages least labelled previously
         # but adding a random element
@@ -297,4 +298,6 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
             raise StopIteration
 
     def __del__(self):
-        self.engine.close()
+        self.session.close()
+        self.engine.dispose()
+        
