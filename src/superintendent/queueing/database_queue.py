@@ -63,20 +63,27 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
 
         self.entry_num = new_entry.id
 
+        # group the labels by feature Id and count the number of entries
         subquery = self.session.query(Labels.feature_id,
                                       func.count(Labels.label_text).label('ct')) \
             .group_by(Labels.feature_id) \
             .subquery()
-
-        query_all = self.session.query(Features, subquery) \
+        # join with the features, filter by message type and order by count desc, choose 400
+        subquery2 = self.session.query(Features, subquery) \
             .outerjoin(subquery, Features.id == subquery.c.feature_id) \
             .filter(Features.type == message_type) \
             .order_by(subquery.c.ct.desc()) \
-            .limit(10)  # number of tweets to review
+            .limit(400)
+
+        # of those we sample ten - so mostly looking at the messages least labelled previously
+        # but adding a random element
+        query_all = self.session.query(subquery2)\
+            .order_by(func.random())\
+            .limit(10) # number of tweets to review
 
         for instance in query_all:
-            row_id = instance.Features.id
-            self.data[row_id] = instance.Features.feature_text
+            row_id = instance.id
+            self.data[row_id] = instance.feature_text
             self.order.appendleft(row_id)
 
     def write_results(self):
