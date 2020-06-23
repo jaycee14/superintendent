@@ -303,7 +303,7 @@ class Labeller(widgets.VBox):
             self.queue.write_results()
 
         finish_celebration = widgets.Box(
-            (widgets.HTML(value="<h1>Finished labelling!</h1>"),),
+            (widgets.HTML(value="<h1>Finished labelling! Please refresh to review more!</h1>"),),
             layout=widgets.Layout(
                 justify_content="center",
                 padding="2.5% 0",

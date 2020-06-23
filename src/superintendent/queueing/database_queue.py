@@ -300,4 +300,4 @@ class SimpleDatabaseQueue(BaseLabellingQueue):
     def __del__(self):
         self.session.close()
         self.engine.dispose()
-        
+
